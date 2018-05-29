@@ -160,12 +160,9 @@ class Danamon
         curl_setopt($ch, CURLOPT_URL, $this->url);
         // grab URL and pass it to the browser
         $content = curl_exec( $ch );
-        $err     = curl_errno( $ch );
-        $errmsg  = curl_error( $ch );
-        $header  = curl_getinfo( $ch );
 
-        //go to account pAGE
-        $this->url = 'https://www.danamonline.com/onlinebanking/default.aspx?usercontrol=AcctMgmt/am_AcctSummaryNew_lst';
+//===========Go to transaction page =============================================================
+        $this->url = 'https://www.danamonline.com/onlinebanking/default.aspx?usercontrol=DepositAcct/dp_TrxHistory_new';
 
         curl_setopt($ch, CURLOPT_HEADER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
@@ -188,10 +185,6 @@ class Danamon
         curl_setopt($ch, CURLOPT_URL, $this->url);
         // grab URL and pass it to the browser
         $content = curl_exec( $ch );
-        $err     = curl_errno( $ch );
-        $errmsg  = curl_error( $ch );
-        $header  = curl_getinfo( $ch );
-
         $body = preg_replace('#<script(.*?)>(.*?)</script>#is', '', $content);
 
         $dom = new DOMDocument('1.0', 'UTF-8');
@@ -206,123 +199,86 @@ class Danamon
         // Restore error level
         libxml_use_internal_errors($internalErrors);
 
-        $ahref = $dom->getElementsByTagName('a');
-        $eventTarget = '';
-        $eventArgument = '';
-
-        if ($ahref instanceOf DOMNodeList) {
-            foreach ($ahref as $href) {
-                if ($href->getAttribute('id') == '_ctl0') {
-                    $eventTargetArgument =  $href->getAttribute('href');
-                    $eventTargetArgument = str_replace("javascript:__doPostBack('","",$eventTargetArgument);
-                    $eventTargetArgument = str_replace("')","",$eventTargetArgument);
-                    $eventTargetArgument = str_replace("'","",$eventTargetArgument);
-                    $eventTargetArgument = explode(',',$eventTargetArgument);
-                    $eventTarget = $eventTargetArgument[0];
-                    $eventArgument = $eventTargetArgument[1];
-                }
-            }
-        }
-
         $inputs = $dom->getElementsByTagName('input');
         $__VIEWSTATE = '';
+        $____Ticket = '';
         $hdnLanguage = '';
+        $hdnWUC = '';
+        $hidAcctDet = '';
+        $hidCcy = '';
+        $hdnPage = '';
+        $grp_trxPeriod = '';
+        $btnGetDetails = '';
 
         if ($inputs instanceOf DOMNodeList) {
             foreach ($inputs as $input) {
                 if ($input->getAttribute('name') == '__VIEWSTATE') {
                     $__VIEWSTATE =  $input->getAttribute('value');
+                }
+                if ($input->getAttribute('name') == '____Ticket') {
+                    $____Ticket =  $input->getAttribute('value');
+                }
+                if ($input->getAttribute('name') == 'hdnWUC') {
+                    $hdnWUC =  $input->getAttribute('value');
                 }
                 if ($input->getAttribute('name') == 'hdnLanguage') {
                     $hdnLanguage =  $input->getAttribute('value');
                 }
-            }
-        }
-
-//========go to account number page to get statement===========================================================
-        $this->url = 'https://www.danamonline.com/onlinebanking/default.aspx?usercontrol=AcctMgmt/am_AcctSummaryNew_lst';
-        $data = [
-          '__EVENTTARGET'        => $eventTarget,
-          '__EVENTARGUMENT'        => $eventArgument,
-          '__LASTFOCUS'        => '',
-          '__VIEWSTATE'        => $__VIEWSTATE,
-          'hdnActionCd'        => '',
-          'hdnRandomKey'        => '',
-          'hdnWUC'        => 'AcctMgmt/am_AcctSummaryNew_lst',
-          'hdnLanguage'        => $hdnLanguage,
-          'hdnPortlet'        => '',
-          'Portlet1:hdnFunctionId'        => '',
-          '_ctl0:_ctl8:ddlExRate'        => '1'
-        ];
-        $eventvars = explode('^',$eventArgument);
-        $acc_no = $eventvars[1];
-        $data = json_encode($data);
-        curl_setopt($ch, CURLOPT_HEADER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-        curl_setopt($ch, CURLOPT_ENCODING,  'gzip');
-
-        curl_setopt($ch, CURLOPT_USERAGENT, $this->user_agent);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT ,60);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
-        curl_setopt($ch, CURLOPT_FAILONERROR, true);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-        curl_setopt($ch, CURLOPT_COOKIESESSION, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
-        curl_setopt($ch, CURLOPT_POST, TRUE);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-          "Content-Type:multipart/form-data",
-          "Host: www.danamonline.com",
-          "Origin: https://www.danamonline.com",
-          "Referer: https://www.danamonline.com/onlinebanking/default.aspx?usercontrol=AcctMgmt/am_AcctSummaryNew_lst"
-        ));
-        curl_setopt($ch, CURLOPT_COOKIEFILE, getcwd() . $this->cookie);
-        curl_setopt($ch, CURLOPT_COOKIEJAR, getcwd() . $this->cookie);
-        curl_setopt($ch, CURLOPT_URL, $this->url);
-        // grab URL and pass it to the browser
-        $content = curl_exec( $ch );
-        $err     = curl_errno( $ch );
-        $errmsg  = curl_error( $ch );
-        $header  = curl_getinfo( $ch );
-
-        $body = preg_replace('#<script(.*?)>(.*?)</script>#is', '', $content);
-
-        $dom = new DOMDocument('1.0', 'UTF-8');
-
-        // set error level
-        $internalErrors = libxml_use_internal_errors(true);
-
-        $dom->recover = true;
-        $dom->strictErrorChecking = false;
-        $dom->loadHTML($body);
-
-        // Restore error level
-        libxml_use_internal_errors($internalErrors);
-
-        $inputs = $dom->getElementsByTagName('input');
-        $__VIEWSTATE = '';
-        $hdnLanguage = '';
-
-        if ($inputs instanceOf DOMNodeList) {
-            foreach ($inputs as $input) {
-                if ($input->getAttribute('name') == '__VIEWSTATE') {
-                    $__VIEWSTATE =  $input->getAttribute('value');
+                if ($input->getAttribute('name') == '_ctl0:hidAcctDet') {
+                    $hidAcctDet =  $input->getAttribute('value');
+                }
+                if ($input->getAttribute('name') == '_ctl0:hidCcy') {
+                    $hidCcy =  $input->getAttribute('value');
+                }
+                if ($input->getAttribute('name') == '_ctl0:hdnPage') {
+                    $hdnPage =  $input->getAttribute('value');
+                }
+                if ($input->getAttribute('name') == '_ctl0:ddlAcctCCNo') {
+                    $ddlAcctCCNo =  $input->getAttribute('value');
+                }
+                if ($input->getAttribute('name') == '_ctl0:grp_trxPeriod') {
+                    $grp_trxPeriod =  $input->getAttribute('value');
+                }
+                if ($input->getAttribute('name') == '_ctl0:btnGetDetails') {
+                    $btnGetDetails =  $input->getAttribute('value');
                 }
             }
         }
 
+        $ddlAcctCCNo = '';
+        $ddlTrxPeriod = '';
+
+        $optionNodes = $dom->getElementById('_ctl0_ddlAcctCCNo')->getElementsByTagName('option');
+        if(!empty($optionNodes)){
+          foreach($optionNodes as $optionNode) {
+            if(empty($ddlAcctCCNo)){
+              $ddlAcctCCNo = $optionNode->getAttribute('value');
+            }
+
+          }
+        }
+
+        $optionNodes = $dom->getElementById('_ctl0_ddlTrxPeriod')->getElementsByTagName('option');
+        if(!empty($optionNodes)){
+          foreach($optionNodes as $optionNode) {
+            if(empty($ddlTrxPeriod)){
+              $ddlTrxPeriod = $optionNode->getAttribute('value');
+            }
+          }
+        }
 
 //========go to form to get statement==========================================================================
 
-        $this->url = 'https://www.danamonline.com/onlinebanking/default.aspx?usercontrol=AcctMgmt/am_AcctSummaryNew_lst';
+        $this->url = 'https://www.danamonline.com/onlinebanking/default.aspx?usercontrol=DepositAcct%2fdp_TrxHistory_new';
         $data = [
           '__EVENTTARGET'        => '',
           '__EVENTARGUMENT'        => '',
           '__VIEWSTATE'        => $__VIEWSTATE,
+          '____Ticket'          => $____Ticket,
           'hdnActionCd'        => '',
           'hdnRandomKey'        => '',
-          'hdnWUC'        => 'DepositAcct/dp_TrxHistory_new',
-          'hdnLanguage'        => '',
+          'hdnWUC'        => $hdnWUC,
+          'hdnLanguage'        => $hdnLanguage,
           'Portlet1:hdnPortlet'        => '',
           'Portlet1:hdnFunctionId'        => '',
           '_ctl0:hidSortBy'        => '',
@@ -330,19 +286,23 @@ class Danamon
           '_ctl0:hidSortField'        => '',
           '_ctl0:hidSortMethod'        => '',
           '_ctl0:hidAcctType'        => '',
-          '_ctl0:hidAcctDet'        => 'TABUNGAN DANAMON LEBIH '.$acc_no.' (IDR)',
-          '_ctl0:hidCcy'        => 'IDR',
-          '_ctl0:hdnPage'        => 0,
-          '_ctl0:ddlAcctCCNo'        => $acc_no.'IDR',
-          '_ctl0:ddlTrxPeriod'        => '2 Hari Terakhir',
-          '_ctl0:grp_trxPeriod'        => 'rbtnFromTo',
+          '_ctl0:hidAcctDet'        => $hidAcctDet,
+          '_ctl0:hidCcy'        => $hidCcy,
+          '_ctl0:hdnPage'        => $hdnPage,
+          '_ctl0:ddlAcctCCNo'        => $ddlAcctCCNo,
+          '_ctl0:ddlTrxPeriod'        => $ddlTrxPeriod,
+          '_ctl0:grp_trxPeriod'        => $grp_trxPeriod,
           '_ctl0:txtFromDate'        => '01/05/2018',
           '_ctl0:txtToDate'        => '24/05/2018',
-          '_ctl0:btnGetDetails'        => 'Lihat Rincian'
+          '_ctl0:btnGetDetails'        => $btnGetDetails
         ];
 
-        echo '<pre>';print_r($data);echo '</pre>';
-        $data = json_encode($data);
+
+        $boundary = '----WebKitFormBoundary'.uniqid();
+        $delimiter = $boundary;
+        $data = $this->build_data_files($boundary, $data);
+        //$data = json_encode($data);
+          echo '<pre>';  echo $data;echo '</pre>';
         curl_setopt($ch, CURLOPT_HEADER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
@@ -354,15 +314,15 @@ class Danamon
         curl_setopt($ch, CURLOPT_FAILONERROR, true);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_COOKIESESSION, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
         curl_setopt($ch, CURLOPT_POST, TRUE);
         curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-          "Content-Type:multipart/form-data",
+          "Content-Type: multipart/form-data; boundary=" . $delimiter,
+          "Content-Length: " . strlen($data),
           "Host: www.danamonline.com",
           "Origin: https://www.danamonline.com",
-          "Referer: https://www.danamonline.com/onlinebanking/default.aspx?usercontrol=AcctMgmt/am_AcctSummaryNew_lst"
+          "Referer: https://www.danamonline.com/onlinebanking/default.aspx?usercontrol=DepositAcct/dp_TrxHistory_new"
         ));
-        //curl_setopt($ch, CURLOPT_HEADER, 0);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
         curl_setopt($ch, CURLOPT_COOKIEFILE, getcwd() . $this->cookie);
         curl_setopt($ch, CURLOPT_COOKIEJAR, getcwd() . $this->cookie);
         curl_setopt($ch, CURLOPT_URL, $this->url);
@@ -434,37 +394,6 @@ class Danamon
     echo '</form>';
   }
 
-  public function get_welcome_page(){
-    $this->url = 'https://www.danamonline.com/onlinebanking/Default.aspx?usercontrol=Login/lgn_landing&showsplash=1';
-    $ch = curl_init();
-    // Curl to get data login page from BRI
-    curl_setopt($ch, CURLOPT_HEADER, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-    curl_setopt($ch, CURLOPT_ENCODING,  'gzip');
-
-    curl_setopt($ch, CURLOPT_USERAGENT, $this->user_agent);
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT ,60);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 60);
-    curl_setopt($ch, CURLOPT_FAILONERROR, true);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-    curl_setopt($ch, CURLOPT_COOKIESESSION, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-      "Host: www.danamonline.com",
-      "Referer: https://www.danamonline.com/onlinebanking/Login/lgn_new.aspx"
-    ));
-    //curl_setopt($ch, CURLOPT_HEADER, 0);
-    curl_setopt($ch, CURLOPT_COOKIEFILE, getcwd() . $this->cookie);
-    curl_setopt($ch, CURLOPT_COOKIEJAR, getcwd() . $this->cookie);
-    curl_setopt($ch, CURLOPT_URL, $this->url);
-    // grab URL and pass it to the browser
-    $content = curl_exec( $ch );
-    $err     = curl_errno( $ch );
-    $errmsg  = curl_error( $ch );
-    $header  = curl_getinfo( $ch );
-    echo $content;
-  }
-
   public function get_string_between($string, $start, $end){
       $string = ' ' . $string;
       $ini = strpos($string, $start);
@@ -473,6 +402,24 @@ class Danamon
       $len = strpos($string, $end, $ini) - $ini;
       return substr($string, $ini, $len);
   }
+
+  public function build_data_files($boundary, $fields){
+      $data = '';
+      $eol = "\r\n";
+
+      $delimiter = '--' . $boundary;
+
+      foreach ($fields as $name => $content) {
+          $data .= $delimiter . $eol
+              . 'Content-Disposition: form-data; name="' . $name . "\"".$eol.$eol
+              . $content . $eol;
+      }
+      $data .= "--" . $delimiter . "--".$eol;
+
+
+      return $data;
+  }
+
 }
 
 $danamon = new Danamon();
@@ -480,11 +427,6 @@ $danamon->username = 'suyent789';
 $danamon->password = 'Kg080808';
 if(isset($_POST) && !empty($_POST['hdnEncodedString'])){
   $check_login = $danamon->login();
-  if($check_login==true){
-    $danamon->get_welcome_page();
-  }else{
-    echo 'cannot go to welcome page';
-  }
 }else{
   $danamon->generate_encodedString();
 }
