@@ -423,8 +423,8 @@ class Danamon
 }
 
 $danamon = new Danamon();
-$danamon->username = 'suyent789';
-$danamon->password = 'Kg080808';
+$danamon->username = 'username';
+$danamon->password = 'password';
 if(isset($_POST) && !empty($_POST['hdnEncodedString'])){
   $check_login = $danamon->login();
 }else{
