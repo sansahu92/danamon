@@ -1,7 +1,4 @@
 <?php
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
 /**
  * Name - Sandeep Sahu
   Email - san.sahu92@gmail.com
@@ -267,8 +264,9 @@ class Danamon
           }
         }
 
-//========go to form to get statement==========================================================================
-
+//========go to form and get statement==========================================================================
+        $txtFromDate = '28/05/2018';
+        $txtToDate = '29/05/2018';
         $this->url = 'https://www.danamonline.com/onlinebanking/default.aspx?usercontrol=DepositAcct%2fdp_TrxHistory_new';
         $data = [
           '__EVENTTARGET'        => '',
@@ -292,17 +290,15 @@ class Danamon
           '_ctl0:ddlAcctCCNo'        => $ddlAcctCCNo,
           '_ctl0:ddlTrxPeriod'        => $ddlTrxPeriod,
           '_ctl0:grp_trxPeriod'        => $grp_trxPeriod,
-          '_ctl0:txtFromDate'        => '01/05/2018',
-          '_ctl0:txtToDate'        => '24/05/2018',
+          '_ctl0:txtFromDate'        => $txtFromDate,
+          '_ctl0:txtToDate'        => $txtToDate,
           '_ctl0:btnGetDetails'        => $btnGetDetails
         ];
 
-
-        $boundary = '----WebKitFormBoundary'.uniqid();
+        $uniqueId = $this->getToken(16);
+        $boundary = '----WebKitFormBoundary'.$uniqueId;
         $delimiter = $boundary;
         $data = $this->build_data_files($boundary, $data);
-        //$data = json_encode($data);
-          echo '<pre>';  echo $data;echo '</pre>';
         curl_setopt($ch, CURLOPT_HEADER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
@@ -330,10 +326,13 @@ class Danamon
         $content = curl_exec( $ch );
         $err     = curl_errno( $ch );
         $errmsg  = curl_error( $ch );
-        $header  = curl_getinfo( $ch );
+        $header  = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+        $allItems = '';
+        if ($header == 200) {
+            $body = preg_replace('#<script(.*?)>(.*?)</script>#is', '', $content);
 
-        echo $content;
-
+            $allItems = $this->extractStatements($body);
+        }
 
         //logout from bank
         $this->url = 'https://www.danamonline.com/onlinebanking/Login/lgn_logout.aspx';
@@ -363,8 +362,7 @@ class Danamon
         $err     = curl_errno( $ch );
         $errmsg  = curl_error( $ch );
         $header  = curl_getinfo( $ch );
-        die('logout done');
-
+        return $allItems;
       }else{
         return false;
       }
@@ -374,6 +372,96 @@ class Danamon
     }
 
   }
+
+  /**
+   * Extract statements from page.
+   *
+   * @param  \DOMNode  $node
+   * @return \Array
+   * @throws \RuntimeException
+   */
+   private function extractStatements($html)
+   {
+       $dom = new DOMDocument('1.0', 'UTF-8');
+
+       // set error level
+       $internalErrors = libxml_use_internal_errors(true);
+
+       $dom->recover = true;
+       $dom->strictErrorChecking = false;
+       $dom->loadHTML($html);
+
+       // Restore error level
+       libxml_use_internal_errors($internalErrors);
+
+       $tables = $dom->getElementsByTagName('table');
+       $items  = array();
+
+       if ( ! $tables instanceOf DOMNodeList) {
+           return $items;
+       }
+
+       if ( ! isset($tables[9])) {
+           throw new RuntimeException('Required "table" HTML tag does not found at index #11');
+       }
+
+       $rows = $tables[9]->childNodes;
+
+       if ( ! $rows instanceOf DOMNodeList) {
+           throw new RuntimeException('Required "tr" HTML tags does not found below "tbody"');
+       }
+
+       if ($rows->length == 0) {
+           return $items;
+       }
+
+      for($i = 1; $i < $rows->length; ++$i) {
+           $columns = $rows->item($i)->childNodes;
+
+           if ($columns instanceOf DOMNodeList) {
+               if ($columns->length == 1 || ! $columns->item(2) instanceOf DomNode) {
+                   continue;
+               }
+
+               $recordDate = strip_tags($columns->item(1)->nodeValue);
+               //$recordDate = explode('/', $recordDate);
+               $date = $recordDate;
+
+               $description = $this->DOMinnerHTML($columns->item(2));
+               $description = strip_tags($description);
+               $description = trim($description);
+               $description = rtrim($description, '|');
+               $description = preg_replace('/([ ]+)\|/', '|', $description);
+
+               $firstAmount  = trim(strip_tags($columns->item(4)->nodeValue));
+               $secondAmount = trim(strip_tags($columns->item(5)->nodeValue));
+               $saldoAmount = trim(strip_tags($columns->item(6)->nodeValue));
+               $saldoAmount = str_replace('.', '', $saldoAmount);
+               $saldoAmount = str_replace(',', '.', $saldoAmount);
+
+               $type   = ($firstAmount == '') ? 'CR' : 'DB';
+               $amount = ($firstAmount != '') ? $firstAmount : $secondAmount;
+               $amount = str_replace('.', '', $amount);
+               $amount = str_replace(',', '.', $amount);
+
+               $uuidName = trim($date);
+               $uuidName .= '.'.trim($description);
+               $uuidName .= '.'.trim($type);
+               $uuidName .= '.'.trim($amount);
+               $items[] = [
+                   'unique_id'   => md5($uuidName),
+                   'date'        => trim($date),
+                   'description' => trim($description),
+                   'amount'      => trim($amount),
+                   'balance'      => trim($saldoAmount),
+                   'type'        => trim($type)
+               ];
+
+           }
+       }
+       return $items;
+     }
+
 
   public function generate_encodedString(){
 
@@ -414,10 +502,54 @@ class Danamon
               . 'Content-Disposition: form-data; name="' . $name . "\"".$eol.$eol
               . $content . $eol;
       }
-      $data .= "--" . $delimiter . "--".$eol;
-
+      $data .= $delimiter . "--".$eol;
 
       return $data;
+  }
+
+  public function getToken($length){
+    $token = "";
+    $codeAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    $codeAlphabet.= "abcdefghijklmnopqrstuvwxyz";
+    $codeAlphabet.= "0123456789";
+    $max = strlen($codeAlphabet); // edited
+
+    for ($i=0; $i < $length; $i++) {
+        $token .= $codeAlphabet[$this->crypto_rand_secure(0, $max-1)];
+    }
+
+    return $token;
+  }
+
+  public function crypto_rand_secure($min, $max){
+    $range = $max - $min;
+    if ($range < 1) return $min; // not so random...
+    $log = ceil(log($range, 2));
+    $bytes = (int) ($log / 8) + 1; // length in bytes
+    $bits = (int) $log + 1; // length in bits
+    $filter = (int) (1 << $bits) - 1; // set all lower bits to 1
+    do {
+        $rnd = hexdec(bin2hex(openssl_random_pseudo_bytes($bytes)));
+        $rnd = $rnd & $filter; // discard irrelevant bits
+    } while ($rnd > $range);
+    return $min + $rnd;
+  }
+
+  /**
+   * Extract inner HTML from a DOM Node.
+   *
+   * @param  \DOMNode  $node
+   * @return string
+   */
+  protected function DOMinnerHTML(DOMNode $node){
+      $str = '';
+      $children = $node->childNodes;
+
+      foreach ($children as $child) {
+          $str .= $node->ownerDocument->saveHTML($child);
+      }
+
+      return $str;
   }
 
 }
@@ -426,7 +558,8 @@ $danamon = new Danamon();
 $danamon->username = 'username';
 $danamon->password = 'password';
 if(isset($_POST) && !empty($_POST['hdnEncodedString'])){
-  $check_login = $danamon->login();
+  $results = $danamon->login();
+  echo '<pre>';print_r($results);
 }else{
   $danamon->generate_encodedString();
 }
