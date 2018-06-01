@@ -1,2 +1,2 @@
 # danamon
-Danamon mutuasi rekening/ Danamon Bank accoun scrapping
+Danamon mutuasi rekening/ Danamon Bank account scrapping
